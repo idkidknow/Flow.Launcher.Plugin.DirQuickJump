@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Launcher.Plugin.DirQuickJump", "Flow.Launcher.Plugin.DirQuickJump\Flow.Launcher.Plugin.DirQuickJump.csproj", "{771F1A7C-CC92-4F1F-A29F-A0C72655A07D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{771F1A7C-CC92-4F1F-A29F-A0C72655A07D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{771F1A7C-CC92-4F1F-A29F-A0C72655A07D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{771F1A7C-CC92-4F1F-A29F-A0C72655A07D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{771F1A7C-CC92-4F1F-A29F-A0C72655A07D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {797CA174-6139-4924-9128-B309599F8F45}
+	EndGlobalSection
+EndGlobal

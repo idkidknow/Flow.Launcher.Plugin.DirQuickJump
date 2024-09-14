@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Flow.Launcher.Plugin.DirQuickJump</AssemblyName>
+    <PackageId>Flow.Launcher.Plugin.DirQuickJump</PackageId>
+    <Authors>idkana</Authors>
+    <PackageProjectUrl>https://github.com/idkidknow/Flow.Launcher.Plugin.DirQuickJump</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/idkidknow/Flow.Launcher.Plugin.DirQuickJump</RepositoryUrl>
+    <PackageTags>flow-launcher flow-plugin</PackageTags>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>None</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="plugin.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="icon.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Flow.Launcher.Plugin" Version="4.1.0" />
+    <PackageReference Include="H.InputSimulator" Version="1.4.2" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.106">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

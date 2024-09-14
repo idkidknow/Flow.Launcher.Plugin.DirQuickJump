@@ -1,0 +1,7 @@
+GetForegroundWindow
+GetClassName
+SendMessage
+WM_SETTEXT
+FindWindowEx
+GetWindowLong
+WINDOW_STYLE

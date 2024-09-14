@@ -1,0 +1,12 @@
+{
+    "ID": "01B2DC8D31394299ACBE3B32D91FA3EC",
+    "ActionKeyword": "cd",
+    "Name": "DirQuickJump",
+    "Description": "When opening or saving files, quickly jump to the directory you already opened in File Explorer. Inspired by Listary Quick Switch.",
+    "Author": "idkana",
+    "Version": "1.0.0",
+    "Language": "csharp",
+    "Website": "https://github.com/idkidknow/Flow.Launcher.Plugin.DirQuickJump",
+    "IcoPath": "icon.png",
+    "ExecuteFileName": "Flow.Launcher.Plugin.DirQuickJump.dll"
+}
