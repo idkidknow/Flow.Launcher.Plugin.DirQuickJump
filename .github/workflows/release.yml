@@ -31,7 +31,7 @@ jobs:
       run: |
         dotnet publish Flow.Launcher.Plugin.DirQuickJump -c Release -r win-x64 --no-self-contained
         cd Flow.Launcher.Plugin.DirQuickJump/bin/Release/win-x64/publish
-        zip -r ../../../../../Flow.Launcher.Plugin.DirQuickJump.zip ./*
+        Compress-Archive -Path Flow.Launcher.Plugin.DirQuickJump/bin/Release/win-x64/publish/* -DestinationPath Flow.Launcher.Plugin.DirQuickJump.zip
     - name: GitHub Release
       if: success()
       uses: softprops/action-gh-release@v2
