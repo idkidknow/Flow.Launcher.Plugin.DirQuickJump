@@ -1,0 +1,40 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 7.0.x
+    - name: get version
+      id: version
+      uses: notiz-dev/github-action-json-property@release
+      with: 
+        path: 'Flow.Launcher.Plugin.DirQuickJump/plugin.json'
+        prop_path: 'Version'
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: |
+        dotnet publish Flow.Launcher.Plugin.DirQuickJump -c Release -r win-x64 --no-self-contained
+        Compress-Archive -Path Flow.Launcher.Plugin.DirQuickJump/bin/Release/win-x64/publish/* -DestinationPath Flow.Launcher.Plugin.DirQuickJump.zip
+    - name: GitHub Release
+      if: success()
+      uses: softprops/action-gh-release@v2
+      with:
+        files: "Flow.Launcher.Plugin.DirQuickJump.zip"
+        tag_name: "v${{steps.version.outputs.prop}}"
+        token: "${{ secrets.RELEASE_TOKEN }}"
