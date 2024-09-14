@@ -37,4 +37,4 @@ jobs:
       with:
         files: "Flow.Launcher.Plugin.DirQuickJump.zip"
         tag_name: "v${{steps.version.outputs.prop}}"
-        token: "${{ secrets.GITHUB_TOKEN }}"
+        token: "${{ secrets.RELEASE_TOKEN }}"
