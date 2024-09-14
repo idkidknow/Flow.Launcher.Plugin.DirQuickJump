@@ -23,7 +23,7 @@ jobs:
       id: version
       uses: notiz-dev/github-action-json-property@release
       with: 
-        path: 'plugin.json'
+        path: 'Flow.Launcher.Plugin.DirQuickJump/plugin.json'
         prop_path: 'Version'
     - name: Restore dependencies
       run: dotnet restore
