@@ -101,7 +101,7 @@ namespace Flow.Launcher.Plugin.DirQuickJump
                     return;
                 };
                 // Assume that the dialog is in the foreground now
-                JumpOnCurrentDialog(path);
+                DirJump(path, PInvoke.GetForegroundWindow());
             });
             t.Start();
             return true;
@@ -113,7 +113,7 @@ namespace Flow.Launcher.Plugin.DirQuickJump
             }
         }
 
-        private unsafe void JumpOnCurrentDialog(string path)
+        private unsafe void DirJump(string path, HWND dialogHandle)
         {
             // Alt-D to focus on the path input box
             var inputSimulator = new WindowsInput.InputSimulator();
@@ -121,12 +121,17 @@ namespace Flow.Launcher.Plugin.DirQuickJump
 
             // Get the handle of the path input box and then set the text.
             // The window with class name "ComboBoxEx32" is not visible when the path input box is not with the keyboard focus.
-            var dialogHandle = PInvoke.GetForegroundWindow();
             var controlHandle = PInvoke.FindWindowEx(dialogHandle, HWND.Null, "WorkerW", null);
             controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ReBarWindow32", null);
             controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Address Band Root", null);
             controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "msctls_progress32", null);
             controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBoxEx32", null);
+            if (controlHandle == HWND.Null)
+            {
+                _context?.API.LogWarn("DirQuickJump", "ComboBoxEx32 not found. Maybe a legacy dialog?");
+                DirJumpOnLegacyDialog(path, dialogHandle);
+                return;
+            }
             bool timeOut = !SpinWait.SpinUntil(() =>
             {
                 var style = PInvoke.GetWindowLong(controlHandle, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
@@ -139,9 +144,33 @@ namespace Flow.Launcher.Plugin.DirQuickJump
             }
             controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBox", null);
             controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Edit", null);
+            if (controlHandle == HWND.Null)
+            {
+                _context?.API.LogWarn("DirQuickJump", $"Edit control at address bar not found");
+                return;
+            }
 
             Utils.SetWindowText(controlHandle, path);
             inputSimulator.Keyboard.KeyPress(WindowsInput.VirtualKeyCode.RETURN);
+        }
+
+        private unsafe void DirJumpOnLegacyDialog(string path, HWND dialogHandle)
+        {
+            // https://github.com/idkidknow/Flow.Launcher.Plugin.DirQuickJump/issues/1
+            var controlHandle = PInvoke.FindWindowEx(dialogHandle, HWND.Null, "ComboBoxEx32", null);
+            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBox", null);
+            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Edit", null);
+            if (controlHandle == HWND.Null)
+            {
+                _context?.API.LogWarn("DirQuickJump", $"Filename edit control not found");
+                return;
+            }
+            Utils.SetWindowText(controlHandle, path);
+            var inputSimulator = new WindowsInput.InputSimulator();
+            // Alt-O (equivalent to press the Open button) twice. In normal cases it suffices to press once,
+            // but when the focus is on a irrelavent folder, that press once will just open the irrelavent one.
+            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.MENU, WindowsInput.VirtualKeyCode.VK_O);
+            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.MENU, WindowsInput.VirtualKeyCode.VK_O);
         }
 
         internal static class Utils
