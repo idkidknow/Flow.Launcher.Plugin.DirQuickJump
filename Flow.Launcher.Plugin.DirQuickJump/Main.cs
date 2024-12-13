@@ -117,7 +117,7 @@ namespace Flow.Launcher.Plugin.DirQuickJump
         {
             // Alt-D to focus on the path input box
             var inputSimulator = new WindowsInput.InputSimulator();
-            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.MENU, WindowsInput.VirtualKeyCode.VK_D);
+            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_D);
 
             // Get the handle of the path input box and then set the text.
             // The window with class name "ComboBoxEx32" is not visible when the path input box is not with the keyboard focus.
@@ -169,8 +169,8 @@ namespace Flow.Launcher.Plugin.DirQuickJump
             var inputSimulator = new WindowsInput.InputSimulator();
             // Alt-O (equivalent to press the Open button) twice. In normal cases it suffices to press once,
             // but when the focus is on a irrelavent folder, that press once will just open the irrelavent one.
-            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.MENU, WindowsInput.VirtualKeyCode.VK_O);
-            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.MENU, WindowsInput.VirtualKeyCode.VK_O);
+            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_O);
+            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_O);
         }
 
         internal static class Utils
