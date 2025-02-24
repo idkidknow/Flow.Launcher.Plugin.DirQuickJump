@@ -3,194 +3,208 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Windows.Controls;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
 
-namespace Flow.Launcher.Plugin.DirQuickJump
+namespace Flow.Launcher.Plugin.DirQuickJump;
+
+public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
 {
-    public class DirQuickJump : IPlugin, IContextMenu
+    private PluginInitContext? _context;
+
+    public void Init(PluginInitContext context)
     {
-        private PluginInitContext? _context;
+        _context = context;
+    }
 
-        public void Init(PluginInitContext context)
+    public List<Result> Query(Query query)
+    {
+        if (_context is null) throw new UnreachableException(); // Guaranteed by the caller
+
+        var shellApplicationType = Type.GetTypeFromProgID("Shell.Application", true)!;
+        dynamic shellApplication = Activator.CreateInstance(shellApplicationType)!;
+        List<Result> urls = [];
+        foreach (dynamic window in shellApplication.Windows())
         {
-            _context = context;
-        }
+            string name = window.Document.Folder.Self.Name;
+            string path = window.Document.Folder.Self.Path;
+            if (
+                query.Search.Trim() != "" &&
+                !_context.API.FuzzySearch(query.Search, path).Success
+            ) continue;
 
-        public List<Result> Query(Query query)
-        {
-            if (_context is null) throw new UnreachableException(); // Guaranteed by the caller
-
-            Type shellApplicationType = Type.GetTypeFromProgID("Shell.Application", true)!;
-            dynamic shellApplication = Activator.CreateInstance(shellApplicationType)!;
-            List<Result> urls = [];
-            foreach (var window in shellApplication.Windows())
+            var result = new Result
             {
-                string name = window.Document.Folder.Self.Name;
-                string path = window.Document.Folder.Self.Path;
-                if (
-                    query.Search.Trim() != "" &&
-                    !_context.API.FuzzySearch(query.Search, path).Success
-                ) { continue; }
-                var result = new Result
-                {
-                    Title = name,
-                    SubTitle = path,
-                    IcoPath = "icon.png",
-                    Action = ctx =>
-                    {
-                        if (ctx.SpecialKeyState.CtrlPressed) return CopyAction(path);
-                        return JumpAction(path);
-                    },
-                    ContextData = (name, path),
-                };
-                urls.Add(result);
-            }
-            return urls;
-        }
-
-        public List<Result> LoadContextMenus(Result selectedResult)
-        {
-            var (name, path) = ((string, string))selectedResult.ContextData;
-            var jumpAction = new Result
-            {
-                Title = "Jump",
+                Title = name,
                 SubTitle = path,
                 IcoPath = "icon.png",
-                Action = ctx => JumpAction(path),
+                Action = ctx => ctx.SpecialKeyState.CtrlPressed switch
+                {
+                    true => CopyAction(path),
+                    _ => JumpAction(path),
+                },
+                ContextData = path,
             };
-            var showAction = new Result
-            {
-                Title = "Show the path",
-                IcoPath = "icon.png",
-                Action = ctx => ShowAction(path),
-            };
-            var copyAction = new Result
-            {
-                Title = "Copy the path",
-                IcoPath = "icon.png",
-                Action = ctx => CopyAction(path),
-            };
-            return [jumpAction, showAction, copyAction];
+            urls.Add(result);
         }
 
-        private bool ShowAction(string text)
+        return urls;
+    }
+
+    public List<Result> LoadContextMenus(Result selectedResult)
+    {
+        var path = (string) selectedResult.ContextData;
+        var jumpAction = new Result
         {
-            _context?.API.ShowMsg(text);
-            return false;
-        }
-
-        private bool CopyAction(string text)
+            Title = "Jump",
+            SubTitle = path,
+            IcoPath = "icon.png",
+            Action = _ => JumpAction(path),
+        };
+        var showAction = new Result
         {
-            _context?.API.CopyToClipboard(text);
-            return true;
-        }
-
-        private bool JumpAction(string path)
+            Title = "Show the path",
+            IcoPath = "icon.png",
+            Action = _ => ShowAction(path),
+        };
+        var copyAction = new Result
         {
-            var flowHandle = PInvoke.GetForegroundWindow();
-            _context?.API.LogInfo("DirQuickJump", $"Jumping to {path}");
-            var t = new Thread(() =>
-            {
-                // Jump after flow launcher window vanished (after JumpAction returned true)
-                // and the dialog had been in the foreground. The class name of a dialog window is "#32770".
-                bool timeOut = !SpinWait.SpinUntil(() => GetForegroundWindowClassName() == "#32770", 1000);
-                if (timeOut) {
-                    _context?.API.LogWarn("DirQuickJump", "Dialog window not found");
-                    return;
-                };
-                // Assume that the dialog is in the foreground now
-                DirJump(path, PInvoke.GetForegroundWindow());
-            });
-            t.Start();
-            return true;
+            Title = "Copy the path",
+            IcoPath = "icon.png",
+            Action = _ => CopyAction(path),
+        };
+        return [jumpAction, showAction, copyAction];
+    }
 
-            unsafe static string? GetForegroundWindowClassName()
-            {
-                var handle = PInvoke.GetForegroundWindow();
-                return Utils.GetClassName(handle);
-            }
-        }
+    private bool ShowAction(string text)
+    {
+        _context?.API.ShowMsg(text);
+        return false;
+    }
 
-        private unsafe void DirJump(string path, HWND dialogHandle)
+    private bool CopyAction(string text)
+    {
+        _context?.API.CopyToClipboard(text);
+        return true;
+    }
+
+    private bool JumpAction(string path)
+    {
+        _context?.API.LogInfo("DirQuickJump", $"Jumping to {path}");
+        var t = new Thread(() =>
         {
-            // Alt-D to focus on the path input box
-            var inputSimulator = new WindowsInput.InputSimulator();
-            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_D);
-
-            // Get the handle of the path input box and then set the text.
-            // The window with class name "ComboBoxEx32" is not visible when the path input box is not with the keyboard focus.
-            var controlHandle = PInvoke.FindWindowEx(dialogHandle, HWND.Null, "WorkerW", null);
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ReBarWindow32", null);
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Address Band Root", null);
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "msctls_progress32", null);
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBoxEx32", null);
-            if (controlHandle == HWND.Null)
-            {
-                _context?.API.LogWarn("DirQuickJump", "ComboBoxEx32 not found. Maybe a legacy dialog?");
-                DirJumpOnLegacyDialog(path, dialogHandle);
-                return;
-            }
-            bool timeOut = !SpinWait.SpinUntil(() =>
-            {
-                var style = PInvoke.GetWindowLong(controlHandle, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
-                return (style & (int)WINDOW_STYLE.WS_VISIBLE) != 0;
-            }, 1000);
+            // Jump after flow launcher window vanished (after JumpAction returned true)
+            // and the dialog had been in the foreground. The class name of a dialog window is "#32770".
+            bool timeOut = !SpinWait.SpinUntil(() => GetForegroundWindowClassName() == "#32770", 1000);
             if (timeOut)
             {
-                _context?.API.LogWarn("DirQuickJump", $"Alt-D failed. ComboBoxEx32 handle: {controlHandle}");
-                return;
-            }
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBox", null);
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Edit", null);
-            if (controlHandle == HWND.Null)
-            {
-                _context?.API.LogWarn("DirQuickJump", $"Edit control at address bar not found");
+                _context?.API.LogWarn("DirQuickJump", "Dialog window not found");
                 return;
             }
 
-            Utils.SetWindowText(controlHandle, path);
-            inputSimulator.Keyboard.KeyPress(WindowsInput.VirtualKeyCode.RETURN);
+            ;
+            // Assume that the dialog is in the foreground now
+            DirJump(path, PInvoke.GetForegroundWindow());
+        });
+        t.Start();
+        return true;
+
+        static string? GetForegroundWindowClassName()
+        {
+            var handle = PInvoke.GetForegroundWindow();
+            return Utils.GetClassName(handle);
+        }
+    }
+
+    private void DirJump(string path, HWND dialogHandle)
+    {
+        // Alt-D to focus on the path input box
+        var inputSimulator = new WindowsInput.InputSimulator();
+        inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_D);
+
+        // Get the handle of the path input box and then set the text.
+        // The window with class name "ComboBoxEx32" is not visible when the path input box is not with the keyboard focus.
+        var controlHandle = PInvoke.FindWindowEx(dialogHandle, HWND.Null, "WorkerW", null);
+        controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ReBarWindow32", null);
+        controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Address Band Root", null);
+        controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "msctls_progress32", null);
+        controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBoxEx32", null);
+        if (controlHandle == HWND.Null)
+        {
+            _context?.API.LogWarn("DirQuickJump", "ComboBoxEx32 not found. Maybe a legacy dialog?");
+            DirJumpOnLegacyDialog(path, dialogHandle);
+            return;
         }
 
-        private unsafe void DirJumpOnLegacyDialog(string path, HWND dialogHandle)
+        bool timeOut = !SpinWait.SpinUntil(() =>
         {
-            // https://github.com/idkidknow/Flow.Launcher.Plugin.DirQuickJump/issues/1
-            var controlHandle = PInvoke.FindWindowEx(dialogHandle, HWND.Null, "ComboBoxEx32", null);
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBox", null);
-            controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Edit", null);
-            if (controlHandle == HWND.Null)
-            {
-                _context?.API.LogWarn("DirQuickJump", $"Filename edit control not found");
-                return;
-            }
-            Utils.SetWindowText(controlHandle, path);
-            var inputSimulator = new WindowsInput.InputSimulator();
-            // Alt-O (equivalent to press the Open button) twice. In normal cases it suffices to press once,
-            // but when the focus is on a irrelavent folder, that press once will just open the irrelavent one.
-            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_O);
-            inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_O);
+            int style = PInvoke.GetWindowLong(controlHandle, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
+            return (style & (int) WINDOW_STYLE.WS_VISIBLE) != 0;
+        }, 1000);
+        if (timeOut)
+        {
+            _context?.API.LogWarn("DirQuickJump", $"Alt-D failed. ComboBoxEx32 handle: {controlHandle}");
+            return;
         }
 
-        internal static class Utils
+        var editHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBox", null);
+        editHandle = PInvoke.FindWindowEx(editHandle, HWND.Null, "Edit", null);
+        if (editHandle == HWND.Null)
         {
-            internal static unsafe string? GetClassName(HWND handle)
-            {
-                fixed (char* buf = new char[256])
-                {
-                    if (PInvoke.GetClassName(handle, buf, 256) == 0) return null;
-                    return new string(buf);
-                }
-            }
+            _context?.API.LogWarn("DirQuickJump", "Edit control at address bar not found");
+            return;
+        }
 
-            internal static unsafe nint SetWindowText(HWND handle, string text)
+        Utils.SetWindowText(editHandle, path);
+        inputSimulator.Keyboard.KeyPress(WindowsInput.VirtualKeyCode.RETURN);
+    }
+
+    private void DirJumpOnLegacyDialog(string path, HWND dialogHandle)
+    {
+        // https://github.com/idkidknow/Flow.Launcher.Plugin.DirQuickJump/issues/1
+        var controlHandle = PInvoke.FindWindowEx(dialogHandle, HWND.Null, "ComboBoxEx32", null);
+        controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "ComboBox", null);
+        controlHandle = PInvoke.FindWindowEx(controlHandle, HWND.Null, "Edit", null);
+        if (controlHandle == HWND.Null)
+        {
+            _context?.API.LogWarn("DirQuickJump", "Filename edit control not found");
+            return;
+        }
+
+        Utils.SetWindowText(controlHandle, path);
+        var inputSimulator = new WindowsInput.InputSimulator();
+        // Alt-O (equivalent to press the Open button) twice. In normal cases it suffices to press once,
+        // but when the focus is on an irrelevant folder, that press once will just open the irrelevant one.
+        inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_O);
+        inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_O);
+    }
+
+    public Control CreateSettingPanel()
+    {
+        throw new NotImplementedException();
+    }
+
+    private static class Utils
+    {
+        internal static unsafe string? GetClassName(HWND handle)
+        {
+            fixed (char* buf = new char[256])
             {
-                fixed (char* textPtr = text)
+                return PInvoke.GetClassName(handle, buf, 256) switch
                 {
-                    var result = PInvoke.SendMessage(handle, PInvoke.WM_SETTEXT, 0, (nint)textPtr);
-                    return result.Value;
-                }
+                    0 => null,
+                    _ => new string(buf),
+                };
+            }
+        }
+
+        internal static unsafe nint SetWindowText(HWND handle, string text)
+        {
+            fixed (char* textPtr = text)
+            {
+                return PInvoke.SendMessage(handle, PInvoke.WM_SETTEXT, 0, (nint) textPtr).Value;
             }
         }
     }
