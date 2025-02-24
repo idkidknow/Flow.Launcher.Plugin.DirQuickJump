@@ -3,20 +3,24 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Windows;
 using System.Windows.Controls;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
+using Flow.Launcher.Plugin.DirQuickJump.Settings;
 
 namespace Flow.Launcher.Plugin.DirQuickJump;
 
 public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
 {
     private PluginInitContext? _context;
+    private Settings.Settings? _settings;
 
     public void Init(PluginInitContext context)
     {
         _context = context;
+        _settings = context.API.LoadSettingJsonStorage<Settings.Settings>();
     }
 
     public List<Result> Query(Query query)
@@ -55,7 +59,7 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
 
     public List<Result> LoadContextMenus(Result selectedResult)
     {
-        var path = (string) selectedResult.ContextData;
+        var path = (string)selectedResult.ContextData;
         var jumpAction = new Result
         {
             Title = "Jump",
@@ -120,9 +124,17 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
 
     private void DirJump(string path, HWND dialogHandle)
     {
-        // Alt-D to focus on the path input box
+        // Alt-D or Ctrl-L to focus on the path input box
         var inputSimulator = new WindowsInput.InputSimulator();
-        inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_D);
+        Action action = _settings?.Strategy switch
+        {
+            Strategy.AltD => () => inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU,
+                WindowsInput.VirtualKeyCode.VK_D),
+            Strategy.CtrlL => () => inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LCONTROL,
+                WindowsInput.VirtualKeyCode.VK_L),
+            _ => () => throw new UnreachableException(),
+        };
+        action();
 
         // Get the handle of the path input box and then set the text.
         // The window with class name "ComboBoxEx32" is not visible when the path input box is not with the keyboard focus.
@@ -141,11 +153,11 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
         bool timeOut = !SpinWait.SpinUntil(() =>
         {
             int style = PInvoke.GetWindowLong(controlHandle, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
-            return (style & (int) WINDOW_STYLE.WS_VISIBLE) != 0;
+            return (style & (int)WINDOW_STYLE.WS_VISIBLE) != 0;
         }, 1000);
         if (timeOut)
         {
-            _context?.API.LogWarn("DirQuickJump", $"Alt-D failed. ComboBoxEx32 handle: {controlHandle}");
+            _context?.API.LogWarn("DirQuickJump", $"Alt-D or Ctrl-L failed. ComboBoxEx32 handle: {controlHandle}");
             return;
         }
 
@@ -181,10 +193,56 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
         inputSimulator.Keyboard.ModifiedKeyStroke(WindowsInput.VirtualKeyCode.LMENU, WindowsInput.VirtualKeyCode.VK_O);
     }
 
+    #region Settings GUI
+
     public Control CreateSettingPanel()
     {
-        throw new NotImplementedException();
+        var control = new UserControl();
+        var grid = new Grid();
+        var gridCol1 = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
+        var gridCol2 = new ColumnDefinition();
+        grid.ColumnDefinitions.Add(gridCol1);
+        grid.ColumnDefinitions.Add(gridCol2);
+        var text = new TextBlock
+        {
+            Text = "How to navigate to the path",
+            Margin = new Thickness(70, 9, 18, 9),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            TextAlignment = TextAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(text, 0);
+        var comboBox = new ComboBox
+        {
+            ItemsSource = new[] { "Alt-D", "Ctrl-L" },
+            SelectedItem = _settings?.Strategy switch
+            {
+                Strategy.AltD => "Alt-D",
+                Strategy.CtrlL => "Ctrl-L",
+                _ => "Alt-D",
+            },
+            IsEditable = false,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 9, 18, 9),
+        };
+        Grid.SetColumn(comboBox, 1);
+        comboBox.DropDownClosed += (_, _) =>
+        {
+            _settings!.Strategy = comboBox.Text switch
+            {
+                "Alt-D" => Strategy.AltD,
+                "Ctrl-L" => Strategy.CtrlL,
+                _ => throw new UnreachableException(),
+            };
+        };
+        grid.Children.Add(text);
+        grid.Children.Add(comboBox);
+        control.Content = grid;
+        return control;
     }
+
+    #endregion
 
     private static class Utils
     {
@@ -204,7 +262,7 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
         {
             fixed (char* textPtr = text)
             {
-                return PInvoke.SendMessage(handle, PInvoke.WM_SETTEXT, 0, (nint) textPtr).Value;
+                return PInvoke.SendMessage(handle, PInvoke.WM_SETTEXT, 0, (nint)textPtr).Value;
             }
         }
     }
