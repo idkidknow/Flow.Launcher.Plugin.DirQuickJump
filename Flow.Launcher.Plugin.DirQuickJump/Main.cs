@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -29,7 +30,8 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
 
         var shellApplicationType = Type.GetTypeFromProgID("Shell.Application", true)!;
         dynamic shellApplication = Activator.CreateInstance(shellApplicationType)!;
-        List<Result> urls = [];
+        
+        List<(string, string)> entries = [];
         foreach (dynamic window in shellApplication.Windows())
         {
             string name = window.Document.Folder.Self.Name;
@@ -39,7 +41,19 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
                 !_context.API.FuzzySearch(query.Search, path).Success
             ) continue;
 
-            var result = new Result
+            entries.Add((name, path));
+        }
+
+        if (query.Search.Trim() != "")
+        {
+            string literalPath = query.Search;
+            entries.Add((literalPath, literalPath));
+        }
+        
+        return entries.Select(entry =>
+        {
+            (string name, string path) = entry;
+            return new Result
             {
                 Title = name,
                 SubTitle = path,
@@ -51,10 +65,7 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
                 },
                 ContextData = path,
             };
-            urls.Add(result);
-        }
-
-        return urls;
+        }).ToList();
     }
 
     public List<Result> LoadContextMenus(Result selectedResult)
