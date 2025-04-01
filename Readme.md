@@ -8,3 +8,8 @@ When opening or saving files, quickly jump to the directory you already opened i
 Tested on Windows 11 and supposed to work on Windows 10
 
 ![usage](./usage.gif)
+
+## Supported file managers
+
+- explorer.exe
+- Directory Opus

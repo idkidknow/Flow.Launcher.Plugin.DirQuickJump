@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
+using Flow.Launcher.Plugin.DirQuickJump.FileManager;
 using Flow.Launcher.Plugin.DirQuickJump.Settings;
 
 namespace Flow.Launcher.Plugin.DirQuickJump;
@@ -28,29 +29,25 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
     {
         if (_context is null) throw new UnreachableException(); // Guaranteed by the caller
 
-        var shellApplicationType = Type.GetTypeFromProgID("Shell.Application", true)!;
-        dynamic shellApplication = Activator.CreateInstance(shellApplicationType)!;
+        List<IFileManager> fileManagers = [new Explorer(), new DirectoryOpus()];
         
-        List<(string, string)> entries = [];
-        foreach (dynamic window in shellApplication.Windows())
-        {
-            string name = window.Document.Folder.Self.Name;
-            string path = window.Document.Folder.Self.Path;
-            if (
-                query.Search.Trim() != "" &&
-                !_context.API.FuzzySearch(query.Search, path).Success
-            ) continue;
-
-            entries.Add((name, path));
-        }
+        var entries = fileManagers
+            .SelectMany(manager => manager.GetEntries())
+            .Where(e =>
+                query.Search.Trim() == "" ||
+                _context.API.FuzzySearch(query.Search, e.Name).Success ||
+                _context.API.FuzzySearch(query.Search, e.Path).Success
+            );
 
         if (query.Search.Trim() != "")
         {
             string literalPath = query.Search;
-            entries.Add((literalPath, literalPath));
+            entries = entries.Append(new Entry(literalPath, literalPath));
         }
-        
-        return entries.Select(entry =>
+
+        // https://github.com/Flow-Launcher/Flow.Launcher/discussions/2993
+        const int step = 10000;
+        return entries.Select((entry, i) =>
         {
             (string name, string path) = entry;
             return new Result
@@ -64,6 +61,7 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
                     _ => JumpAction(path),
                 },
                 ContextData = path,
+                Score = int.MaxValue - i * step,
             };
         }).ToList();
     }
