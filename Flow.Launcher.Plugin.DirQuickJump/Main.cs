@@ -29,7 +29,7 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
     {
         if (_context is null) throw new UnreachableException(); // Guaranteed by the caller
 
-        List<IFileManager> fileManagers = [new Explorer(), new DirectoryOpus()];
+        List<IFileManager> fileManagers = [new Explorer(), new DirectoryOpus(), new XYplorer()];
         
         var entries = fileManagers
             .SelectMany(manager => manager.GetEntries())
@@ -252,27 +252,4 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
     }
 
     #endregion
-
-    private static class Utils
-    {
-        internal static unsafe string? GetClassName(HWND handle)
-        {
-            fixed (char* buf = new char[256])
-            {
-                return PInvoke.GetClassName(handle, buf, 256) switch
-                {
-                    0 => null,
-                    _ => new string(buf),
-                };
-            }
-        }
-
-        internal static unsafe nint SetWindowText(HWND handle, string text)
-        {
-            fixed (char* textPtr = text)
-            {
-                return PInvoke.SendMessage(handle, PInvoke.WM_SETTEXT, 0, (nint)textPtr).Value;
-            }
-        }
-    }
 }
