@@ -29,8 +29,13 @@ public class DirQuickJump : IPlugin, IContextMenu, ISettingProvider
     {
         if (_context is null) throw new UnreachableException(); // Guaranteed by the caller
 
-        List<IFileManager> fileManagers = [new Explorer(), new DirectoryOpus(), new XYplorer()];
-        
+        List<IFileManager> fileManagers = [
+            new Explorer(),
+            new DirectoryOpus(),
+            new XYplorer(),
+            new OneCommander(),
+        ];
+
         var entries = fileManagers
             .SelectMany(manager => manager.GetEntries())
             .Where(e =>
