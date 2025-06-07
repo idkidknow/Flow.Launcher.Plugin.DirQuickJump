@@ -14,3 +14,4 @@ Tested on Windows 11 and supposed to work on Windows 10
 - explorer.exe
 - Directory Opus
 - XYplorer
+- OneCommander
